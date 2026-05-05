@@ -1,13 +1,16 @@
-use std::{
-    io::{self, Write},
-    sync::Arc,
-};
+use std::io;
+use std::io::Write;
+use std::sync::Arc;
 
 use comfy_table::Table;
 use indicatif::MultiProgress;
-use new_vdf_parser::{open_shortcuts_vdf, write_shortcuts_vdf};
-use serde_json::{Map, Value};
-use steamer::{AssetType, GameSearchObject, SteamGridClient};
+use new_vdf_parser::open_shortcuts_vdf;
+use new_vdf_parser::write_shortcuts_vdf;
+use serde_json::Map;
+use serde_json::Value;
+use steamer::AssetType;
+use steamer::GameSearchObject;
+use steamer::SteamGridClient;
 use steamlocate::Shortcut;
 
 #[tokio::main]
@@ -44,7 +47,7 @@ async fn main() -> anyhow::Result<()> {
 
     std::fs::create_dir_all(&grid_base)?;
 
-    println!("Using Steam directory - {}", steam.path().display());
+    println!("Found Steam directory - {}", steam.path().display());
 
     // Non steam games
     let shortcuts = steam
@@ -111,7 +114,7 @@ async fn main() -> anyhow::Result<()> {
 }
 
 fn choose_game(games: &'_ [GameSearchObject], interactive: bool) -> Option<&'_ GameSearchObject> {
-    if !interactive {
+    if !interactive || games.is_empty() {
         return games.first();
     }
 

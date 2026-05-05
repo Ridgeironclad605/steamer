@@ -1,8 +1,14 @@
-use std::{fmt::Display, path::Path, sync::Arc};
+use std::fmt::Display;
+use std::path::Path;
+use std::sync::Arc;
 
-use bytes::{BufMut, Bytes, BytesMut};
+use bytes::BufMut;
+use bytes::Bytes;
+use bytes::BytesMut;
 use futures_util::StreamExt;
-use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
+use indicatif::MultiProgress;
+use indicatif::ProgressBar;
+use indicatif::ProgressStyle;
 use serde::Deserialize;
 
 pub struct SteamGridClient {
@@ -100,6 +106,7 @@ impl SteamGridClient {
 
         let format = match asset.mime.as_str() {
             "image/png" => ImageType::Png,
+            "image/jpeg" => ImageType::Jpg,
             "image/vnd.microsoft.icon" => ImageType::Ico,
             e => anyhow::bail!("Unknown mime type: {e}"),
         };
