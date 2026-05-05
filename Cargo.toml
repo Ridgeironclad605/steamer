@@ -1,0 +1,16 @@
+[package]
+name = "steamer"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+anyhow = "1.0.102"
+bytes = "1.11.1"
+futures = "0.3.32"
+futures-util = "0.3.32"
+indicatif = "0.18.4"
+keyvalues-parser = "0.2.3"
+reqwest = { version = "0.13.3", features = ["json", "query", "stream"] }
+serde = { version = "1.0.228", features = ["derive"] }
+steamlocate = "2.1.0"
+tokio = { version = "1.52.2", features = ["macros", "rt-multi-thread"] }
