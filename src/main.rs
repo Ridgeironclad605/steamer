@@ -5,6 +5,8 @@ use std::{
 
 use comfy_table::Table;
 use indicatif::MultiProgress;
+use new_vdf_parser::{open_shortcuts_vdf, write_shortcuts_vdf};
+use serde_json::{Map, Value};
 use steamer::{AssetType, GameSearchObject, SteamGridClient};
 use steamlocate::Shortcut;
 
@@ -22,6 +24,16 @@ async fn main() -> anyhow::Result<()> {
         let obj = keyvalues_parser::Vdf::parse(&contents)?.value.unwrap_obj();
         obj.keys().next().unwrap().parse::<u64>()? - 76561197960265728
     };
+
+    // I hate that I needed an entire libary for this
+    let shortcuts_vdf_path = steam
+        .path()
+        .join("userdata")
+        .join(user_id.to_string())
+        .join("config")
+        .join("shortcuts.vdf");
+
+    let mut shortcut_vdf = open_shortcuts_vdf(&shortcuts_vdf_path);
 
     let grid_base = steam
         .path()
@@ -42,7 +54,7 @@ async fn main() -> anyhow::Result<()> {
 
     println!("Found {} non-steam game(s)!\n", shortcuts.len());
 
-    for s in shortcuts {
+    for (i, s) in shortcuts.iter().enumerate() {
         let games = client.search_by_name(&s.app_name).await?;
 
         let Some(game) = choose_game(&games, interactive) else {
@@ -52,36 +64,47 @@ async fn main() -> anyhow::Result<()> {
 
         println!("Downloading assets for: {} (app_id {})", game.name, game.id);
 
-        let (grids, heroes, logos) = tokio::join!(
+        let (grids, heroes, logos, icons) = tokio::join!(
             client.find_asset(game.id, AssetType::Grid),
             client.find_asset(game.id, AssetType::Hero),
             client.find_asset(game.id, AssetType::Logo),
+            client.find_asset(game.id, AssetType::Icon),
         );
 
         let grids = grids?;
         let heroes = heroes?;
         let logos = logos?;
+        let icons = icons?;
 
-        if grids.is_empty() || heroes.is_empty() || logos.is_empty() {
+        if grids.is_empty() || heroes.is_empty() || logos.is_empty() || icons.is_empty() {
             println!("Not enough assets for this game, skipping...\n");
             continue;
         }
 
         let mp = Arc::new(MultiProgress::new());
 
-        let (grid, hero, logo) = tokio::join!(
+        let (grid, hero, logo, icon) = tokio::join!(
             client.download_asset(&grids[0], AssetType::Grid, mp.clone()),
             client.download_asset(&heroes[0], AssetType::Hero, mp.clone()),
-            client.download_asset(&logos[0], AssetType::Logo, mp)
+            client.download_asset(&logos[0], AssetType::Logo, mp.clone()),
+            client.download_asset(&icons[0], AssetType::Icon, mp)
         );
 
         grid?.save(s.app_id, &grid_base, AssetType::Grid)?;
         hero?.save(s.app_id, &grid_base, AssetType::Hero)?;
         logo?.save(s.app_id, &grid_base, AssetType::Logo)?;
 
+        // Icons need to be updated in the vdf
+        let icon_path = icon?.save(s.app_id, &grid_base, AssetType::Icon)?;
+        shortcut_vdf[i.to_string()]["icon"] = Value::String(icon_path);
+
         println!("\n\n");
     }
 
+    let mut actual_vdf = Value::Object(Map::new());
+    actual_vdf["shortcuts"] = shortcut_vdf;
+
+    write_shortcuts_vdf(&shortcuts_vdf_path, actual_vdf);
     println!("Done! All assets were saved at {}", grid_base.display());
 
     Ok(())

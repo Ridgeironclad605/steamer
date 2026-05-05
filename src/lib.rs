@@ -100,6 +100,7 @@ impl SteamGridClient {
 
         let format = match asset.mime.as_str() {
             "image/png" => ImageType::Png,
+            "image/vnd.microsoft.icon" => ImageType::Ico,
             e => anyhow::bail!("Unknown mime type: {e}"),
         };
 
@@ -192,14 +193,16 @@ pub enum ImageType {
     Png,
     Jpg,
     Webp,
+    Ico,
 }
 
 impl Image {
-    pub fn save(self, app_id: u32, dir: &Path, asset_type: AssetType) -> std::io::Result<()> {
+    pub fn save(self, app_id: u32, dir: &Path, asset_type: AssetType) -> std::io::Result<String> {
         let ext = match self.format {
             ImageType::Png => "png",
             ImageType::Jpg => "jpg",
             ImageType::Webp => "png", // Webp saves as png
+            ImageType::Ico => "ico",
         };
 
         let filename = match asset_type {
@@ -211,7 +214,9 @@ impl Image {
 
         let path = dir.join(&filename);
 
-        std::fs::write(path, self.bytes)
+        std::fs::write(&path, self.bytes)?;
+
+        Ok(path.display().to_string())
     }
 }
 
