@@ -1,67 +1,51 @@
-use std::sync::Arc;
+use std::{
+    io::{self, Write},
+    sync::Arc,
+};
 
+use comfy_table::Table;
 use indicatif::MultiProgress;
-use steamer::{AssetType, SteamGridClient};
+use steamer::{AssetType, GameSearchObject, SteamGridClient};
 use steamlocate::Shortcut;
-
-struct MockShortcut {
-    app_name: String,
-    app_id: u32,
-}
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     let api_key = std::env::var("STEAMGRID_API_KEY").expect("STEAMGRID_API_KEY must be set");
     let client = SteamGridClient::new(&api_key)?;
 
+    let interactive = std::env::args().any(|a| a == "--interactive");
+
     let steam = steamlocate::locate()?;
-    // let user_id: u64 = {
-    //     let login_users_vdf = steam.path().join("config").join("loginusers.vdf");
-    //     let contents = std::fs::read_to_string(login_users_vdf)?;
-    //     let obj = keyvalues_parser::Vdf::parse(&contents)?.value.unwrap_obj();
-    //     obj.keys().next().unwrap().parse::<u64>()? - 76561197960265728
-    // };
+    let user_id: u64 = {
+        let login_users_vdf = steam.path().join("config").join("loginusers.vdf");
+        let contents = std::fs::read_to_string(login_users_vdf)?;
+        let obj = keyvalues_parser::Vdf::parse(&contents)?.value.unwrap_obj();
+        obj.keys().next().unwrap().parse::<u64>()? - 76561197960265728
+    };
 
-    let grid_base = std::path::PathBuf::from("./test_grid");
-
-    // let grid_base = steam
-    //     .path()
-    //     .join("userdata")
-    //     .join(user_id.to_string())
-    //     .join("config")
-    //     .join("grid");
+    let grid_base = steam
+        .path()
+        .join("userdata")
+        .join(user_id.to_string())
+        .join("config")
+        .join("grid");
 
     std::fs::create_dir_all(&grid_base)?;
 
     println!("Using Steam directory - {}", steam.path().display());
 
     // Non steam games
-    // let shortcuts = steam
-    //     .shortcuts()?
-    //     .filter_map(Result::ok)
-    //     .collect::<Vec<Shortcut>>();
-
-    let shortcuts = vec![
-        MockShortcut {
-            app_name: "Hades".into(),
-            app_id: 1,
-        },
-        MockShortcut {
-            app_name: "Celeste".into(),
-            app_id: 2,
-        },
-        MockShortcut {
-            app_name: "Dead Cells".into(),
-            app_id: 3,
-        },
-    ];
+    let shortcuts = steam
+        .shortcuts()?
+        .filter_map(Result::ok)
+        .collect::<Vec<Shortcut>>();
 
     println!("Found {} non-steam game(s)!\n", shortcuts.len());
 
     for s in shortcuts {
         let games = client.search_by_name(&s.app_name).await?;
 
-        let Some(game) = games.first() else {
+        let Some(game) = choose_game(&games, interactive) else {
             println!("No match for {}\n", s.app_name);
             continue;
         };
@@ -77,6 +61,11 @@ async fn main() -> anyhow::Result<()> {
         let grids = grids?;
         let heroes = heroes?;
         let logos = logos?;
+
+        if grids.is_empty() || heroes.is_empty() || logos.is_empty() {
+            println!("Not enough assets for this game, skipping...\n");
+            continue;
+        }
 
         let mp = Arc::new(MultiProgress::new());
 
@@ -96,4 +85,46 @@ async fn main() -> anyhow::Result<()> {
     println!("Done! All assets were saved at {}", grid_base.display());
 
     Ok(())
+}
+
+fn choose_game(games: &'_ [GameSearchObject], interactive: bool) -> Option<&'_ GameSearchObject> {
+    if !interactive {
+        return games.first();
+    }
+
+    let mut table = Table::new();
+    table.set_header(vec!["#", "Name", "ID"]);
+
+    let max_choices = games.len().min(5);
+
+    // Only show the first 5 games, others are almost always irrelevant
+    (0..max_choices).for_each(|i| {
+        table.add_row(&[
+            i.to_string(),
+            games[i].name.to_string(),
+            games[i].id.to_string(),
+        ]);
+    });
+
+    println!("Choose which game to pick:\n{table}");
+
+    games.get(read_choice(max_choices))
+}
+
+fn read_choice(max: usize) -> usize {
+    loop {
+        print!("Enter choice (0-{}): ", max - 1);
+        io::stdout().flush().unwrap();
+
+        let mut input = String::new();
+        io::stdin().read_line(&mut input).unwrap();
+
+        if let Ok(n) = input.trim().parse::<usize>()
+            && n < max
+        {
+            return n;
+        }
+
+        println!("Invalid choice, try again.");
+    }
 }
