@@ -1,16 +1,14 @@
-use std::io;
-use std::io::Write;
 use std::sync::Arc;
 
-use comfy_table::Table;
 use indicatif::MultiProgress;
 use new_vdf_parser::open_shortcuts_vdf;
 use new_vdf_parser::write_shortcuts_vdf;
 use serde_json::Map;
 use serde_json::Value;
 use steamer::AssetType;
-use steamer::GameSearchObject;
 use steamer::SteamGridClient;
+use steamer::SteamPaths;
+use steamer::choose_game;
 use steamlocate::Shortcut;
 
 #[tokio::main]
@@ -21,33 +19,14 @@ async fn main() -> anyhow::Result<()> {
     let interactive = std::env::args().any(|a| a == "--interactive");
 
     let steam = steamlocate::locate()?;
-    let user_id: u64 = {
-        let login_users_vdf = steam.path().join("config").join("loginusers.vdf");
-        let contents = std::fs::read_to_string(login_users_vdf)?;
-        let obj = keyvalues_parser::Vdf::parse(&contents)?.value.unwrap_obj();
-        obj.keys().next().unwrap().parse::<u64>()? - 76561197960265728
-    };
-
-    // I hate that I needed an entire libary for this
-    let shortcuts_vdf_path = steam
-        .path()
-        .join("userdata")
-        .join(user_id.to_string())
-        .join("config")
-        .join("shortcuts.vdf");
-
-    let mut shortcut_vdf = open_shortcuts_vdf(&shortcuts_vdf_path);
-
-    let grid_base = steam
-        .path()
-        .join("userdata")
-        .join(user_id.to_string())
-        .join("config")
-        .join("grid");
-
-    std::fs::create_dir_all(&grid_base)?;
-
     println!("Found Steam directory - {}", steam.path().display());
+
+    let steam_paths = SteamPaths::locate(&steam)?;
+
+    println!("Using Grid directory - {}", steam_paths.grid.display());
+    std::fs::create_dir_all(&steam_paths.grid)?;
+
+    let mut shortcuts_vdf = open_shortcuts_vdf(&steam_paths.shortcuts);
 
     // Non steam games
     let shortcuts = steam
@@ -93,64 +72,25 @@ async fn main() -> anyhow::Result<()> {
             client.download_asset(&icons[0], AssetType::Icon, mp)
         );
 
-        grid?.save(s.app_id, &grid_base, AssetType::Grid)?;
-        hero?.save(s.app_id, &grid_base, AssetType::Hero)?;
-        logo?.save(s.app_id, &grid_base, AssetType::Logo)?;
+        grid?.save(s.app_id, &steam_paths.grid, AssetType::Grid)?;
+        hero?.save(s.app_id, &steam_paths.grid, AssetType::Hero)?;
+        logo?.save(s.app_id, &steam_paths.grid, AssetType::Logo)?;
 
         // Icons need to be updated in the vdf
-        let icon_path = icon?.save(s.app_id, &grid_base, AssetType::Icon)?;
-        shortcut_vdf[i.to_string()]["icon"] = Value::String(icon_path);
+        let icon_path = icon?.save(s.app_id, &steam_paths.grid, AssetType::Icon)?;
+        shortcuts_vdf[i.to_string()]["icon"] = Value::String(icon_path);
 
         println!("\n\n");
     }
 
     let mut actual_vdf = Value::Object(Map::new());
-    actual_vdf["shortcuts"] = shortcut_vdf;
+    actual_vdf["shortcuts"] = shortcuts_vdf;
 
-    write_shortcuts_vdf(&shortcuts_vdf_path, actual_vdf);
-    println!("Done! All assets were saved at {}", grid_base.display());
+    write_shortcuts_vdf(&steam_paths.shortcuts, actual_vdf);
+    println!(
+        "Done! All assets were saved at {}",
+        steam_paths.grid.display()
+    );
 
     Ok(())
-}
-
-fn choose_game(games: &'_ [GameSearchObject], interactive: bool) -> Option<&'_ GameSearchObject> {
-    if !interactive || games.is_empty() {
-        return games.first();
-    }
-
-    let mut table = Table::new();
-    table.set_header(vec!["#", "Name", "ID"]);
-
-    let max_choices = games.len().min(5);
-
-    // Only show the first 5 games, others are almost always irrelevant
-    (0..max_choices).for_each(|i| {
-        table.add_row(&[
-            i.to_string(),
-            games[i].name.to_string(),
-            games[i].id.to_string(),
-        ]);
-    });
-
-    println!("Choose which game to pick:\n{table}");
-
-    games.get(read_choice(max_choices))
-}
-
-fn read_choice(max: usize) -> usize {
-    loop {
-        print!("Enter choice (0-{}): ", max - 1);
-        io::stdout().flush().unwrap();
-
-        let mut input = String::new();
-        io::stdin().read_line(&mut input).unwrap();
-
-        if let Ok(n) = input.trim().parse::<usize>()
-            && n < max
-        {
-            return n;
-        }
-
-        println!("Invalid choice, try again.");
-    }
 }

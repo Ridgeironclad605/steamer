@@ -1,15 +1,20 @@
 use std::fmt::Display;
+use std::io;
+use std::io::Write;
 use std::path::Path;
+use std::path::PathBuf;
 use std::sync::Arc;
 
 use bytes::BufMut;
 use bytes::Bytes;
 use bytes::BytesMut;
+use comfy_table::Table;
 use futures_util::StreamExt;
 use indicatif::MultiProgress;
 use indicatif::ProgressBar;
 use indicatif::ProgressStyle;
 use serde::Deserialize;
+use steamlocate::SteamDir;
 
 pub struct SteamGridClient {
     client: reqwest::Client,
@@ -237,6 +242,8 @@ impl AssetType {
         }
     }
 
+    /// If you want to customize your banner types, you will need to change these query parameters
+    /// Maybe in future these could be user configurable
     const fn get_query_params(&self) -> &[(&'static str, &'static str)] {
         match self {
             AssetType::Grid => &[
@@ -252,5 +259,80 @@ impl AssetType {
             AssetType::Logo => &[("types", "static"), ("nsfw", "any")],
             AssetType::Icon => &[("styles", "official"), ("types", "static"), ("nsfw", "any")],
         }
+    }
+}
+
+pub fn choose_game(
+    games: &'_ [GameSearchObject],
+    interactive: bool,
+) -> Option<&'_ GameSearchObject> {
+    if !interactive || games.is_empty() {
+        return games.first();
+    }
+
+    let mut table = Table::new();
+    table.set_header(vec!["#", "Name", "ID"]);
+
+    let max_choices = games.len().min(5);
+
+    // Only show the first 5 games, others are almost always irrelevant
+    (0..max_choices).for_each(|i| {
+        table.add_row(&[
+            i.to_string(),
+            games[i].name.to_string(),
+            games[i].id.to_string(),
+        ]);
+    });
+
+    println!("Choose which game to pick:\n{table}");
+
+    games.get(read_choice(max_choices))
+}
+
+pub fn read_choice(max: usize) -> usize {
+    loop {
+        print!("Enter choice, (0-{}): ", max - 1);
+        io::stdout().flush().unwrap();
+
+        let mut input = String::new();
+        io::stdin().read_line(&mut input).unwrap();
+
+        if let Ok(n) = input.trim().parse::<usize>()
+            && n < max
+        {
+            return n;
+        }
+
+        println!("Invalid choice, try again.");
+    }
+}
+
+pub struct SteamPaths {
+    pub shortcuts: PathBuf,
+    pub grid: PathBuf,
+}
+
+impl SteamPaths {
+    pub fn locate(steam: &SteamDir) -> anyhow::Result<Self> {
+        let user_id: u64 = {
+            let login_users_vdf = steam.path().join("config").join("loginusers.vdf");
+            let contents = std::fs::read_to_string(login_users_vdf)?;
+            let obj = keyvalues_parser::Vdf::parse(&contents)?.value.unwrap_obj();
+            obj.keys().next().unwrap().parse::<u64>()? - 76561197960265728
+        };
+
+        let config_path = steam
+            .path()
+            .join("userdata")
+            .join(user_id.to_string())
+            .join("config");
+
+        let shortcuts_path = config_path.join("shortcuts.vdf");
+        let grid_path = config_path.join("grid");
+
+        Ok(SteamPaths {
+            shortcuts: shortcuts_path,
+            grid: grid_path,
+        })
     }
 }
