@@ -1,7 +1,7 @@
 # steamer
 
-A CLI-tool to automatically fetch and download SteamGridDB for your non-steam games.  
-Downloads icon, grid, hero and logo for each game. Skips the game if any are not available.
+A CLI-tool to automatically fetch and download SteamGridDB assets for your non-steam games.  
+Downloads missing icon, grid, hero and logo for each game. Will preserve existing assets by default but can be overridden by the `--overwrite` flag.
 
 Tested on linux, other platforms untested but should work.
 
@@ -14,6 +14,8 @@ cargo install --git https://github.com/kaezrr/steamer.git
 ```
 
 ## Usage
+
+You will need a SteamGridDB API key in order to use this tool, you can get it by creating an account on [SteamGridDB](https://www.steamgriddb.com/) and then going to [preferences > api](https://www.steamgriddb.com/profile/preferences/api)
 
 ```sh
 Usage: steamer [OPTIONS] --api-key <API_KEY>
