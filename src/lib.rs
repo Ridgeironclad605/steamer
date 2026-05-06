@@ -28,7 +28,7 @@ impl SteamGridClient {
     pub fn new(api_key: &str) -> anyhow::Result<Self> {
         let mut headers = reqwest::header::HeaderMap::new();
 
-        let auth_value = format!("Bearer {}", api_key);
+        let auth_value = format!("Bearer {api_key}");
 
         headers.insert(
             reqwest::header::AUTHORIZATION,
@@ -178,6 +178,7 @@ pub struct Author {
     pub avatar: String,
 }
 
+#[derive(Clone, Copy)]
 pub enum AssetType {
     Grid,
     Hero,
@@ -188,10 +189,10 @@ pub enum AssetType {
 impl Display for AssetType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            AssetType::Grid => write!(f, "Grid"),
-            AssetType::Hero => write!(f, "Hero"),
-            AssetType::Logo => write!(f, "Logo"),
-            AssetType::Icon => write!(f, "Icon"),
+            Self::Grid => write!(f, "Grid"),
+            Self::Hero => write!(f, "Hero"),
+            Self::Logo => write!(f, "Logo"),
+            Self::Icon => write!(f, "Icon"),
         }
     }
 }
@@ -211,17 +212,16 @@ pub enum ImageType {
 impl Image {
     pub fn save(self, app_id: u32, dir: &Path, asset_type: AssetType) -> std::io::Result<String> {
         let ext = match self.format {
-            ImageType::Png => "png",
             ImageType::Jpg => "jpg",
-            ImageType::Webp => "png", // Webp saves as png
+            ImageType::Png | ImageType::Webp => "png", // Webp saves as png
             ImageType::Ico => "ico",
         };
 
         let filename = match asset_type {
-            AssetType::Grid => format!("{}p.{}", app_id, ext),
-            AssetType::Hero => format!("{}_hero.{}", app_id, ext),
-            AssetType::Logo => format!("{}_logo.{}", app_id, ext),
-            AssetType::Icon => format!("{}_icon.{}", app_id, ext),
+            AssetType::Grid => format!("{app_id}p.{ext}"),
+            AssetType::Hero => format!("{app_id}_hero.{ext}"),
+            AssetType::Logo => format!("{app_id}_logo.{ext}"),
+            AssetType::Icon => format!("{app_id}_icon.{ext}"),
         };
 
         let path = dir.join(&filename);
@@ -233,12 +233,12 @@ impl Image {
 }
 
 impl AssetType {
-    const fn get_url(&self) -> &'static str {
+    const fn get_url(self) -> &'static str {
         match self {
-            AssetType::Grid => "/grids/game/",
-            AssetType::Hero => "/heroes/game/",
-            AssetType::Logo => "/logos/game/",
-            AssetType::Icon => "/icons/game/",
+            Self::Grid => "/grids/game/",
+            Self::Hero => "/heroes/game/",
+            Self::Logo => "/logos/game/",
+            Self::Icon => "/icons/game/",
         }
     }
 
@@ -246,22 +246,23 @@ impl AssetType {
     /// Maybe in future these could be user configurable
     const fn get_query_params(&self) -> &[(&'static str, &'static str)] {
         match self {
-            AssetType::Grid => &[
+            Self::Grid => &[
                 ("dimensions", "600x900"),
                 ("types", "static"),
                 ("nsfw", "any"),
             ],
-            AssetType::Hero => &[
+            Self::Hero => &[
                 ("dimensions", "3840x1240"),
                 ("types", "static"),
                 ("nsfw", "any"),
             ],
-            AssetType::Logo => &[("types", "static"), ("nsfw", "any")],
-            AssetType::Icon => &[("styles", "official"), ("types", "static"), ("nsfw", "any")],
+            Self::Logo => &[("types", "static"), ("nsfw", "any")],
+            Self::Icon => &[("styles", "official"), ("types", "static"), ("nsfw", "any")],
         }
     }
 }
 
+#[must_use]
 pub fn choose_game(
     games: &'_ [GameSearchObject],
     interactive: bool,
@@ -279,7 +280,7 @@ pub fn choose_game(
     (0..max_choices).for_each(|i| {
         table.add_row(&[
             i.to_string(),
-            games[i].name.to_string(),
+            games[i].name.clone(),
             games[i].id.to_string(),
         ]);
     });
@@ -289,13 +290,14 @@ pub fn choose_game(
     games.get(read_choice(max_choices))
 }
 
+#[must_use]
 pub fn read_choice(max: usize) -> usize {
     loop {
         print!("Enter choice, (0-{}): ", max - 1);
-        io::stdout().flush().unwrap();
+        io::stdout().flush().expect("io flush");
 
         let mut input = String::new();
-        io::stdin().read_line(&mut input).unwrap();
+        io::stdin().read_line(&mut input).expect("read line");
 
         if let Ok(n) = input.trim().parse::<usize>()
             && n < max
@@ -318,7 +320,7 @@ impl SteamPaths {
             let login_users_vdf = steam.path().join("config").join("loginusers.vdf");
             let contents = std::fs::read_to_string(login_users_vdf)?;
             let obj = keyvalues_parser::Vdf::parse(&contents)?.value.unwrap_obj();
-            obj.keys().next().unwrap().parse::<u64>()? - 76561197960265728
+            obj.keys().next().expect("login_user").parse::<u64>()? - 76_561_197_960_265_728
         };
 
         let config_path = steam
@@ -330,7 +332,7 @@ impl SteamPaths {
         let shortcuts_path = config_path.join("shortcuts.vdf");
         let grid_path = config_path.join("grid");
 
-        Ok(SteamPaths {
+        Ok(Self {
             shortcuts: shortcuts_path,
             grid: grid_path,
         })

@@ -33,9 +33,9 @@ async fn main() -> anyhow::Result<()> {
 
     println!("Found {} non-steam game(s)!\n", shortcuts.len());
 
-    for (_, v) in shortcuts.iter_mut() {
-        let app_name = v["AppName"].as_str().unwrap();
-        let app_id = v["appid"].as_u64().unwrap() as u32;
+    for v in shortcuts.values_mut() {
+        let app_name = v["AppName"].as_str().expect("AppName key");
+        let app_id = v["appid"].as_u64().expect("appid key") as u32;
 
         let games = client.search_by_name(app_name).await?;
 
