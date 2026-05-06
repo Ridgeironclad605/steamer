@@ -7,7 +7,9 @@ Tested on linux, other platforms untested but should work.
 
 ## Installation
 
-Install it via `cargo` the Rust package manager:
+You can download the [latest release](https://github.com/kaezrr/steamer/releases/latest) of the tool directly from github.
+
+Alternatively you can install it via `cargo`, the Rust package manager:
 
 ```sh
 cargo install --git https://github.com/kaezrr/steamer.git
