@@ -2,6 +2,12 @@
 name = "steamer"
 version = "0.1.0"
 edition = "2024"
+description = "A CLI tool to automate adding steamgrid assets to your steam library"
+readme = "README.md"
+repository = "https://github.com/kaezrr/steamer"
+license-file = "LICENSE"
+keywords = ["steam", "steamgrid"]
+categories = ["command-line-utilities"]
 
 [dependencies]
 anyhow = "1.0.102"
