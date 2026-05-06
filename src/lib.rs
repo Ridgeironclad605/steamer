@@ -338,3 +338,35 @@ impl SteamPaths {
         })
     }
 }
+
+#[must_use]
+pub fn asset_exists(app_id: u32, grid_dir: &Path, asset_type: &AssetType) -> bool {
+    let suffix = match asset_type {
+        AssetType::Grid => "p",
+        AssetType::Hero => "_hero",
+        AssetType::Logo => "_logo",
+        AssetType::Icon => "_icon",
+    };
+
+    for ext in &[".jpg", ".ico", ".png"] {
+        let path = grid_dir.join(format!("{app_id}{suffix}{ext}"));
+        if path.exists() {
+            return true;
+        }
+    }
+
+    false
+}
+
+pub async fn download_first_if_any(
+    client: &SteamGridClient,
+    assets: Option<&[GridAsset]>,
+    asset_type: AssetType,
+    mp: Arc<MultiProgress>,
+) -> anyhow::Result<Option<Image>> {
+    if let Some(asset) = assets.and_then(|v| v.first()) {
+        Ok(Some(client.download_asset(asset, asset_type, mp).await?))
+    } else {
+        Ok(None)
+    }
+}

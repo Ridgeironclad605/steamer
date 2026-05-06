@@ -1,6 +1,6 @@
 [package]
 name = "steamer"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2024"
 description = "A CLI tool to automate adding steamgrid assets to your steam library"
 readme = "README.md"
@@ -12,6 +12,7 @@ categories = ["command-line-utilities"]
 [dependencies]
 anyhow = "1.0.102"
 bytes = "1.11.1"
+clap = { version = "4.6.1", features = ["derive"] }
 comfy-table = "7.2.2"
 futures-util = "0.3.32"
 indicatif = "0.18.4"
@@ -34,6 +35,7 @@ cast_possible_truncation = "allow"
 cast_possible_wrap = "allow"
 cast_precision_loss = "allow"
 cast_sign_loss = "allow"
+doc_markdown = "allow"
 missing_errors_doc = "allow"
 missing_panics_doc = "allow"
 similar_names = "allow"
