@@ -9,7 +9,6 @@ use steamer::AssetType;
 use steamer::SteamGridClient;
 use steamer::SteamPaths;
 use steamer::choose_game;
-use steamlocate::Shortcut;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -28,19 +27,20 @@ async fn main() -> anyhow::Result<()> {
 
     let mut shortcuts_vdf = open_shortcuts_vdf(&steam_paths.shortcuts);
 
-    // Non steam games
-    let shortcuts = steam
-        .shortcuts()?
-        .filter_map(Result::ok)
-        .collect::<Vec<Shortcut>>();
+    let shortcuts = shortcuts_vdf
+        .as_object_mut()
+        .expect("shortcuts_vdf must be a json object");
 
     println!("Found {} non-steam game(s)!\n", shortcuts.len());
 
-    for (i, s) in shortcuts.iter().enumerate() {
-        let games = client.search_by_name(&s.app_name).await?;
+    for (_, v) in shortcuts.iter_mut() {
+        let app_name = v["AppName"].as_str().unwrap();
+        let app_id = v["appid"].as_u64().unwrap() as u32;
+
+        let games = client.search_by_name(app_name).await?;
 
         let Some(game) = choose_game(&games, interactive) else {
-            println!("No match for {}\n", s.app_name);
+            println!("No match for {app_name}\n");
             continue;
         };
 
@@ -72,21 +72,21 @@ async fn main() -> anyhow::Result<()> {
             client.download_asset(&icons[0], AssetType::Icon, mp)
         );
 
-        grid?.save(s.app_id, &steam_paths.grid, AssetType::Grid)?;
-        hero?.save(s.app_id, &steam_paths.grid, AssetType::Hero)?;
-        logo?.save(s.app_id, &steam_paths.grid, AssetType::Logo)?;
+        grid?.save(app_id, &steam_paths.grid, AssetType::Grid)?;
+        hero?.save(app_id, &steam_paths.grid, AssetType::Hero)?;
+        logo?.save(app_id, &steam_paths.grid, AssetType::Logo)?;
 
         // Icons need to be updated in the vdf
-        let icon_path = icon?.save(s.app_id, &steam_paths.grid, AssetType::Icon)?;
-        shortcuts_vdf[i.to_string()]["icon"] = Value::String(icon_path);
+        let icon_path = icon?.save(app_id, &steam_paths.grid, AssetType::Icon)?;
+        v["icon"] = Value::String(icon_path);
 
         println!("\n\n");
     }
 
-    let mut actual_vdf = Value::Object(Map::new());
-    actual_vdf["shortcuts"] = shortcuts_vdf;
+    let mut vdf_to_write = Value::Object(Map::new());
+    vdf_to_write["shortcuts"] = shortcuts_vdf;
 
-    write_shortcuts_vdf(&steam_paths.shortcuts, actual_vdf);
+    write_shortcuts_vdf(&steam_paths.shortcuts, vdf_to_write);
     println!(
         "Done! All assets were saved at {}",
         steam_paths.grid.display()
